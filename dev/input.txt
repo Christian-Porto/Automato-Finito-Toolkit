@@ -1,0 +1,12 @@
+A B C D E F
+A
+F
+A 0 B
+B 0 B
+A epsilon C
+C 0 D
+A 1 D
+D 1 D
+D epsilon E
+E 1 F
+A epsilon F

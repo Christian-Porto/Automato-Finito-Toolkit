@@ -1,0 +1,9 @@
+.projectile
+venv/
+__pycache__/
+test/__pycache__/
+Digraph.gv
+Digraph.gv.pdf
+Graph.gv
+Graph.gv.pdf
+README.html

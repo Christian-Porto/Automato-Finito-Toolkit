@@ -1,0 +1,27 @@
+A B C D E F G H I
+A
+I
+A 0 A
+A 1 A
+A epsilon B
+B 0 B
+B epsilon C
+C 1 C
+C epsilon I
+I 0 I
+I 1 I
+A epsilon D
+D 0 D
+D 1 D
+D epsilon E
+E 0 E
+E 1 F
+F 1 F
+F epsilon C
+F 0 G
+G 0 G
+G 1 G
+G epsilon H
+H 1 H
+H 0 H
+H epsilon C

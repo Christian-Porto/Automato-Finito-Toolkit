@@ -1,0 +1,9 @@
+A B C D
+A
+D
+A 1 B
+A epsilon C
+B 0 D
+C 0 D
+B 1 B
+C 1 C
