@@ -1,8 +1,0 @@
-A B C D E
-A
-E
-A epsilon B
-A epsilon C
-B 0 D
-C 1 D
-D 1 E

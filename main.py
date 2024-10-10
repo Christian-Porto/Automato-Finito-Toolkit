@@ -1,94 +1,170 @@
-import parser          # Importa o módulo 'parser' para análise do arquivo de entrada NFA
-import tree            # Importa o módulo 'tree' para manipulação da estrutura do autômato
-import visualize       # Importa o módulo 'visualize' para gerar visualizações do autômato
-import argparse        # Importa o módulo 'argparse' para manipular argumentos de linha de comando
-import word            # Importa o módulo 'word' para verificar a aceitação de palavras pelo autômato
+class Automato:
+    def __init__(self):
+        # Inicializa os componentes do autômato: estados, transições, estado inicial e estados finais
+        self.estados = set()
+        self.transicoes = {}
+        self.estado_inicial = None
+        self.estados_finais = set()
 
-if __name__ == "__main__":
-    # Cria um parser de argumentos de linha de comando com uma descrição do programa
-    argparser = argparse.ArgumentParser(
-        description="DFA to NFA converter",
-        formatter_class=argparse.RawTextHelpFormatter
-    )
+    def adicionar_estado(self, estado, final=False):
+        # Adiciona um novo estado ao autômato
+        # Se o estado for final, ele é adicionado ao conjunto de estados finais
+        self.estados.add(estado)
+        if final:
+            self.estados_finais.add(estado)
 
-    # Adiciona o argumento '-i' ou '--input' para especificar o caminho do arquivo NFA de entrada
-    argparser.add_argument(
-        "-i", "--input",
-        required=False,
-        help="Path to the NFA input file"
-    )
-    # Adiciona o argumento '-m' ou '--mode' para selecionar o modo de operação (visualização ou aceitação)
-    argparser.add_argument(
-        "-m", "--mode",
-        default="visualize",
-        choices=["visualize", "acceptance"],
-        help=(
-            "Output mode\n"
-            "-visualize: for a visualization of the generated DFA\n"
-            "-acceptance: to check if words are accepted by the generated DFA"
-        )
-    )
-    # Adiciona o argumento '-w' ou '--words' para especificar o caminho do arquivo com palavras a serem verificadas
-    argparser.add_argument(
-        "-w", "--words",
-        required=False,
-        help="Path to the words input file"
-    )
+    def definir_transicao(self, estado_origem, simbolo, estado_destino):
+        # Define uma transição entre estados com um determinado símbolo
+        # Se o estado de origem ainda não tem transições, inicializa o dicionário
+        if estado_origem not in self.transicoes:
+            self.transicoes[estado_origem] = {}
+        # Se não houver transição para o símbolo, cria uma nova lista de destinos
+        if simbolo not in self.transicoes[estado_origem]:
+            self.transicoes[estado_origem][simbolo] = []
+        # Adiciona o estado de destino à lista de transições para o símbolo
+        self.transicoes[estado_origem][simbolo].append(estado_destino)
 
-    # Analisa os argumentos fornecidos na linha de comando
-    args = argparser.parse_args()
-    config = vars(args)  # Converte os argumentos em um dicionário para fácil acesso
+    def set_estado_inicial(self, estado):
+        # Define o estado inicial do autômato
+        self.estado_inicial = estado
 
-    input_path = "dev/input.txt"  # Define um caminho padrão para o arquivo NFA de entrada
+    def estados_alcancaveis_por_epsilon(self, estados):
+        # Calcula o fecho-ε (ε-closure) para um conjunto de estados, ou seja, todos os estados
+        # alcançáveis a partir dos estados dados, usando transições epsilon (representadas por 'h')
+        estados_alcancados = set(estados)
+        pilha = list(estados)
 
-    output_mode = config["mode"]  # Obtém o modo de operação selecionado
+        # Enquanto houver estados na pilha, processa cada um para buscar novas transições epsilon
+        while pilha:
+            estado = pilha.pop()
+            # Verifica se há transições epsilon ('h') a partir do estado atual
+            if estado in self.transicoes and 'h' in self.transicoes[estado]:
+                for proximo_estado in self.transicoes[estado]['h']:
+                    # Se o estado de destino ainda não foi alcançado, adiciona à pilha e ao conjunto
+                    if proximo_estado not in estados_alcancados:
+                        estados_alcancados.add(proximo_estado)
+                        pilha.append(proximo_estado)
 
-    # Se um caminho de arquivo de entrada foi fornecido, atualiza o caminho do arquivo NFA
-    if config["input"] is not None:
-        input_path = config["input"]
+        return estados_alcancados
 
-    words = config["words"]  # Obtém o caminho do arquivo de palavras, se fornecido
+    def verificar_se_aceita(self, palavra):
+        # Verifica se o autômato aceita uma palavra
+        # Começa pelo fecho-ε do estado inicial
+        estados_alcancaveis = self.estados_alcancaveis_por_epsilon({self.estado_inicial})
 
-    # Verifica se o modo 'acceptance' foi selecionado sem um arquivo de palavras
-    if output_mode == "acceptance" and words is None:
-        print(
-            "Error: You can only use the acceptance mode if you provide"
-            " a path containing a list of words to verify"
-        )
-        exit(1)  # Encerra o programa com um código de erro
+        # Para cada símbolo da palavra, atualiza os estados alcançáveis
+        for simbolo in palavra:
+            novos_estados = set()
+            for estado in estados_alcancaveis:
+                # Se houver transições para o símbolo, adiciona os estados de destino
+                if estado in self.transicoes and simbolo in self.transicoes[estado]:
+                    novos_estados.update(self.transicoes[estado][simbolo])
 
-    try:
-        # Analisa o arquivo NFA de entrada e constrói a estrutura base do autômato
-        parsed_tree = parser.parse_file(input_path)
-        built_tree = parser.build_base_tree(parsed_tree)
-        # Executa o fluxo principal para converter o NFA em DFA
-        st = tree.flow(built_tree)
+            # Calcula o fecho-ε para os novos estados alcançáveis
+            estados_alcancaveis = self.estados_alcancaveis_por_epsilon(novos_estados)
 
-        # Obtém a tabela de estados, o estado final e o estado inicial do DFA
-        state_table = st["r"]
-        final_key = st["final_key"]
-        starting_key = st["starting_key"]
+        # Verifica se algum dos estados finais foi alcançado após processar a palavra
+        return any(estado in self.estados_finais for estado in estados_alcancaveis)
 
-        if output_mode == "visualize":
-            # Gera a visualização do DFA usando o módulo 'visualize'
-            visualization_graph = visualize.build_visualization(
-                state_table, final_key, starting_key
-            )
-            print("Visualization Graph:\n")
-            print(visualization_graph)  # Imprime a representação do grafo
-            visualization_graph.view()  # Abre a visualização em um visualizador externo
-        elif output_mode == "acceptance":
-            # Informa que irá verificar as palavras do arquivo fornecido contra o DFA gerado
-            print(
-                "Checking words from file: " + words + " against DFA generated"
-                " from file " + input_path
-            )
+    # Função para transformar o AFND-ε em AFD
+    def converter_para_afd(self):
+        # Mapeia conjuntos de estados (tuplas) do AFND-ε para novos estados no AFD
+        novos_estados = {}
+        afd_transicoes = {}  # Armazena as transições do AFD
+        afd_estados_finais = set()  # Armazena os estados finais do AFD
 
-            starting_state_key = built_tree["rt"]["start"]  # Obtém o estado inicial do NFA
-            # Verifica se as palavras do arquivo são aceitas pelo DFA
-            word.check_words_from_file(words, st, starting_state_key)
+        # O estado inicial do AFD será o fecho-ε do estado inicial do AFND
+        estado_inicial_afd = tuple(sorted(self.estados_alcancaveis_por_epsilon({self.estado_inicial})))
+        novos_estados[estado_inicial_afd] = 'Q0'  # Nomeia o estado inicial do AFD como Q0
+        pilha = [estado_inicial_afd]  # Usamos uma pilha para processar os novos estados
 
-    except Exception as e:
-        # Captura qualquer exceção que ocorra durante a execução e informa ao usuário
-        print("An error occurred. Please check your NFA input file")
-        print("Error: " + str(e))
+        # Obtém todos os símbolos do autômato, exceto as transições epsilon ('h')
+        simbolos = set(s for trans in self.transicoes.values() for s in trans if s != 'h')
+
+        contador_estado = 1  # Contador para nomear os novos estados do AFD
+        while pilha:
+            estado_atual = pilha.pop()
+            afd_transicoes[novos_estados[estado_atual]] = {}  # Inicializa as transições do estado atual
+
+            # Processa cada símbolo do alfabeto
+            for simbolo in simbolos:
+                novos_conjuntos = set()
+
+                # Para cada estado no conjunto atual, segue as transições para o símbolo
+                for estado in estado_atual:
+                    if estado in self.transicoes and simbolo in self.transicoes[estado]:
+                        novos_conjuntos.update(self.transicoes[estado][simbolo])
+
+                # Calcula o fecho-ε do conjunto de estados alcançados
+                novos_conjuntos = self.estados_alcancaveis_por_epsilon(novos_conjuntos)
+                if novos_conjuntos:
+                    # Organiza o conjunto de estados e transforma em tupla para garantir a unicidade
+                    novos_conjuntos = tuple(sorted(novos_conjuntos))
+                    if novos_conjuntos not in novos_estados:
+                        # Cria um novo estado no AFD se ele ainda não existe
+                        novos_estados[novos_conjuntos] = f'Q{contador_estado}'
+                        contador_estado += 1
+                        pilha.append(novos_conjuntos)  # Adiciona o novo estado à pilha para processar
+
+                    # Adiciona a transição ao AFD
+                    afd_transicoes[novos_estados[estado_atual]][simbolo] = novos_estados[novos_conjuntos]
+
+        # Define os estados finais do AFD: se qualquer estado do conjunto original for final, o estado do AFD será final
+        for conjunto, nome_estado in novos_estados.items():
+            if any(estado in self.estados_finais for estado in conjunto):
+                afd_estados_finais.add(nome_estado)
+
+        # Imprime a definição do AFD gerado
+        print("\n--- AFD Gerado ---")
+        print(f"Estado Inicial: {novos_estados[estado_inicial_afd]}")
+        print(f"Estados Finais: {afd_estados_finais}")
+        print("Transições:")
+        for estado, trans in afd_transicoes.items():
+            for simbolo, destino in trans.items():
+                print(f"{estado} -- {simbolo} --> {destino}")
+
+        return afd_transicoes, novos_estados[estado_inicial_afd], afd_estados_finais
+
+
+# Exemplo de uso do autômato
+automato = Automato()
+
+# Definindo estados no autômato AFND
+automato.adicionar_estado('A')
+automato.adicionar_estado('B')
+automato.adicionar_estado('C')
+automato.adicionar_estado('D')
+automato.adicionar_estado('E', final=True)  # Estado E é um estado final
+automato.adicionar_estado('F')
+automato.adicionar_estado('G')
+automato.adicionar_estado('I')
+
+# Definindo as transições do AFND-ε (com transições epsilon representadas por 'h')
+automato.definir_transicao('A', 'h', 'C')  # A -> ε -> C
+automato.definir_transicao('A', '1', 'B')  # A -> 1 -> B
+automato.definir_transicao('A', 'h', 'G')  # A -> ε -> G
+automato.definir_transicao('B', '1', 'B')  # B -> 1 -> B
+automato.definir_transicao('B', '0', 'F')  # B -> 0 -> F
+automato.definir_transicao('C', '0', 'D')  # C -> 0 -> D
+automato.definir_transicao('D', '1', 'D')  # D -> 1 -> D
+automato.definir_transicao('D', '0', 'E')  # D -> 0 -> E
+automato.definir_transicao('D', '0', 'I')  # D -> 0 -> I
+automato.definir_transicao('F', 'h', 'G')  # F -> ε -> G
+automato.definir_transicao('G', '1', 'I')  # G -> 1 -> I
+automato.definir_transicao('I', '0', 'I')  # I -> 0 -> I
+automato.definir_transicao('I', '1', 'E')  # I -> 1 -> E
+
+# Definindo o estado inicial do AFND
+automato.set_estado_inicial('A')
+
+# Converter o AFND-ε em AFD e imprimir a definição do AFD
+afd_transicoes, estado_inicial_afd, estados_finais_afd = automato.converter_para_afd()
+
+# Testando o autômato AFND e AFD com as mesmas palavras
+palavras = ['011110', '0111', '11101000', '00', '11', '10001', '00001', '11011', '11010001', '01110001']
+print("\n--- Resultados ---")
+for palavra in palavras:
+    aceita = automato.verificar_se_aceita(palavra)
+    print(f"A palavra '{palavra}' é aceita : {aceita}")
+
+
